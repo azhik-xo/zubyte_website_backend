@@ -1,0 +1,35 @@
+name: Keep Render Backend & MongoDB Alive
+
+on:
+  schedule:
+    # Runs every 14 minutes to prevent Render 15-minute sleep and MongoDB Atlas 60-day pause
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions dashboard
+
+jobs:
+  keep-alive:
+    name: Ping Render Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping API Health Endpoint
+        run: |
+          echo "========================================="
+          echo "Sending Keep-Alive Ping to Zubyte Backend..."
+          echo "Timestamp: $(date -u)"
+          echo "========================================="
+
+          TARGET_URL="https://zubyte-website-backend.onrender.com/api/health"
+          
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}\nTIME_TOTAL:%{time_total}s" "$TARGET_URL")
+          
+          echo "$RESPONSE"
+          
+          if echo "$RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Keep-alive ping successful! Backend & Database are active."
+          else
+            echo "⚠️ Health check returned non-200 status, attempting root ping..."
+            curl -s "https://zubyte-website-backend.onrender.com/"
+          fi
+
