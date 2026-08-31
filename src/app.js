@@ -24,27 +24,45 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// ─── 1. GLOBAL SECURITY & LOGGING MIDDLEWARES ────────────────────────────────
+// ─── 1. TRUST PROXY FOR HOSTING (RENDER / REVERSE PROXIES) ───────────────────
+app.set('trust proxy', 1);
+
+// ─── 2. GLOBAL SECURITY & LOGGING MIDDLEWARES ────────────────────────────────
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
 
-const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+// Flexible CORS Configuration supporting Render & Vercel
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
+  .split(',')
+  .map((url) => url.trim().replace(/\/+$/, ''));
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (
-        !origin ||
-        origin === clientUrl ||
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('http://127.0.0.1:')
-      ) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+
+      // Allow wildcard or explicit allowed list
+      if (process.env.CLIENT_URL === '*' || allowedOrigins.includes('*')) {
+        return callback(null, true);
       }
+
+      if (
+        allowedOrigins.includes(normalizedOrigin) ||
+        normalizedOrigin.startsWith('http://localhost:') ||
+        normalizedOrigin.startsWith('http://127.0.0.1:') ||
+        normalizedOrigin.endsWith('.vercel.app') ||
+        normalizedOrigin.endsWith('.onrender.com')
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -65,17 +83,28 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // General API rate limiting
 app.use('/api', generalApiLimiter);
 
-// ─── 2. HEALTH CHECK ─────────────────────────────────────────────────────────
+// ─── 3. HEALTH & ROOT STATUS CHECKS ──────────────────────────────────────────
+app.get('/', (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: '🚀 Zubyte Solution REST API is running online',
+    health: '/api/health',
+    docs: '/api',
+    environment: process.env.NODE_ENV || 'production',
+  });
+});
+
 app.get('/api/health', (req, res) => {
   return ApiResponse.success(res, {
     status: 'online',
     timestamp: new Date().toISOString(),
     service: 'Zubyte Backend API',
-    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'production',
   });
 });
 
-// ─── 3. MOUNT API ROUTES ─────────────────────────────────────────────────────
+// ─── 4. MOUNT API ROUTES ─────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
@@ -86,12 +115,12 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api', demoRoutes);
 app.use('/api', companyRoutes);
 
-// ─── 4. 404 NOT FOUND HANDLER ────────────────────────────────────────────────
+// ─── 5. 404 NOT FOUND HANDLER ────────────────────────────────────────────────
 app.use((req, res) => {
   return ApiResponse.notFound(res, `API route '${req.originalUrl}' does not exist`);
 });
 
-// ─── 5. CENTRALIZED ERROR HANDLER ────────────────────────────────────────────
+// ─── 6. CENTRALIZED ERROR HANDLER ────────────────────────────────────────────
 app.use(errorHandler);
 
 export default app;
