@@ -115,10 +115,20 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api', demoRoutes);
 app.use('/api', companyRoutes);
 
+// Fallback aliases without /api prefix (for flexible client requests)
+app.use('/auth', authRoutes);
+app.use('/contact', contactRoutes);
+app.use('/services', serviceRoutes);
+app.use('/products', productRoutes);
+app.use('/portfolio', portfolioRoutes);
+app.use('/', demoRoutes);
+app.use('/', companyRoutes);
+
 // ─── 5. 404 NOT FOUND HANDLER ────────────────────────────────────────────────
 app.use((req, res) => {
   return ApiResponse.notFound(res, `API route '${req.originalUrl}' does not exist`);
 });
+
 
 // ─── 6. CENTRALIZED ERROR HANDLER ────────────────────────────────────────────
 app.use(errorHandler);
