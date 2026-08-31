@@ -15,6 +15,14 @@ const companySchema = new mongoose.Schema(
         sub: String,
       },
     ],
+    clientLogos: [
+      {
+        name: { type: String, required: true },
+        logoUrl: { type: String, default: '' },
+        order: { type: Number, default: 0 },
+        active: { type: Boolean, default: true },
+      },
+    ],
     leadership: {
       name: String,
       role: String,
@@ -40,4 +48,3 @@ const companySchema = new mongoose.Schema(
 );
 
 export const Company = mongoose.model('Company', companySchema);
-

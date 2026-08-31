@@ -577,7 +577,16 @@ const COMPANY_SEED = {
     { stat: '4×', label: 'Average ROI', sub: 'within 12 months' },
     { stat: '8 wk', label: 'Time to market', sub: 'from brief to live MVP' },
   ],
+  clientLogos: [
+    { name: 'APEX SYSTEMS', order: 1, active: true },
+    { name: 'NOVACORP', order: 2, active: true },
+    { name: 'SYNTHESIS', order: 3, active: true },
+    { name: 'VERTEX AI', order: 4, active: true },
+    { name: 'HYPERION', order: 5, active: true },
+    { name: 'LUMEN LABS', order: 6, active: true },
+  ],
   leadership: {
+
     name: 'Dinesh Murugan',
     role: 'CEO, ZuByte Solution',
     quote:
