@@ -19,31 +19,31 @@ const getOrCreateCompany = async () => {
   let modified = false;
 
   // Ensure clientLogos exists
-  if (!company.clientLogos || company.clientLogos.length === 0) {
+  if (!company.clientLogos) {
     company.clientLogos = COMPANY_SEED.clientLogos || [];
     modified = true;
   }
 
   // Ensure coreValues exists
-  if (!company.coreValues || company.coreValues.length === 0) {
+  if (!company.coreValues) {
     company.coreValues = COMPANY_SEED.coreValues || [];
     modified = true;
   }
 
   // Ensure storyMilestones exists
-  if (!company.storyMilestones || company.storyMilestones.length === 0) {
+  if (!company.storyMilestones) {
     company.storyMilestones = COMPANY_SEED.storyMilestones || [];
     modified = true;
   }
 
   // Ensure offices exists
-  if (!company.offices || company.offices.length === 0) {
+  if (!company.offices) {
     company.offices = COMPANY_SEED.offices || [];
     modified = true;
   }
 
   // Ensure processSteps exists
-  if (!company.processSteps || company.processSteps.length === 0) {
+  if (!company.processSteps) {
     company.processSteps = COMPANY_SEED.processSteps || [];
     modified = true;
   }
@@ -131,30 +131,37 @@ export const updateCompanyInfo = async (req, res, next) => {
 
       if (Array.isArray(updateData.stats)) {
         company.stats = updateData.stats;
+        company.markModified('stats');
       }
 
       if (Array.isArray(updateData.coreValues)) {
         company.coreValues = updateData.coreValues;
+        company.markModified('coreValues');
       }
 
       if (Array.isArray(updateData.storyMilestones)) {
         company.storyMilestones = updateData.storyMilestones;
+        company.markModified('storyMilestones');
       }
 
       if (Array.isArray(updateData.offices)) {
         company.offices = updateData.offices;
+        company.markModified('offices');
       }
 
       if (Array.isArray(updateData.faqs)) {
         company.faqs = updateData.faqs;
+        company.markModified('faqs');
       }
 
       if (Array.isArray(updateData.clientLogos)) {
         company.clientLogos = updateData.clientLogos;
+        company.markModified('clientLogos');
       }
 
       if (Array.isArray(updateData.processSteps)) {
         company.processSteps = updateData.processSteps;
+        company.markModified('processSteps');
       }
 
       await company.save();
@@ -207,6 +214,7 @@ export const updateClientLogos = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.clientLogos = clientLogos;
+      company.markModified('clientLogos');
       await company.save();
       return ApiResponse.success(res, company.clientLogos, 'Client logos updated successfully');
     }
@@ -292,6 +300,7 @@ export const updateCompanyStats = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.stats = stats;
+      company.markModified('stats');
       await company.save();
       return ApiResponse.success(res, company.stats, 'Company stats updated successfully');
     }
@@ -345,6 +354,7 @@ export const updateCoreValues = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.coreValues = coreValues;
+      company.markModified('coreValues');
       await company.save();
       return ApiResponse.success(res, company.coreValues, 'Core values updated successfully');
     }
@@ -372,6 +382,7 @@ export const updateStoryMilestones = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.storyMilestones = storyMilestones;
+      company.markModified('storyMilestones');
       await company.save();
       return ApiResponse.success(res, company.storyMilestones, 'Story milestones updated successfully');
     }
@@ -399,6 +410,7 @@ export const updateOffices = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.offices = offices;
+      company.markModified('offices');
       await company.save();
       return ApiResponse.success(res, company.offices, 'Global offices updated successfully');
     }
@@ -446,6 +458,7 @@ export const updateFaqs = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.faqs = faqs;
+      company.markModified('faqs');
       await company.save();
       return ApiResponse.success(res, company.faqs, 'FAQs updated successfully');
     }
@@ -473,6 +486,7 @@ export const updateProcessSteps = async (req, res, next) => {
     if (mongoose.connection.readyState === 1) {
       const company = await getOrCreateCompany();
       company.processSteps = processSteps;
+      company.markModified('processSteps');
       await company.save();
       return ApiResponse.success(res, company.processSteps, 'Process steps updated successfully');
     }
@@ -483,4 +497,46 @@ export const updateProcessSteps = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Delete single office by ID or Index
+ * @route   DELETE /api/company/offices/:id
+ * @access  Private (Admin, Developer)
+ */
+export const deleteOffice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (mongoose.connection.readyState === 1) {
+      const company = await getOrCreateCompany();
+
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        company.offices = (company.offices || []).filter(
+          (o) => o._id && o._id.toString() !== id
+        );
+      } else if (!isNaN(Number(id))) {
+        const idx = Number(id);
+        company.offices = (company.offices || []).filter((_, i) => i !== idx);
+      } else {
+        company.offices = (company.offices || []).filter(
+          (o) => o.city?.toLowerCase() !== id.toLowerCase()
+        );
+      }
+
+      company.markModified('offices');
+      await company.save();
+      return ApiResponse.success(res, company.offices, 'Office deleted successfully');
+    }
+
+    if (inMemoryCompany.offices) {
+      inMemoryCompany.offices = inMemoryCompany.offices.filter(
+        (o, idx) => o._id !== id && idx !== Number(id) && o.city?.toLowerCase() !== id.toLowerCase()
+      );
+    }
+    return ApiResponse.success(res, inMemoryCompany.offices, 'Office deleted (offline mode)');
+  } catch (error) {
+    next(error);
+  }
+};
+
 

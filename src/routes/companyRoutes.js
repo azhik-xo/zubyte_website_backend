@@ -11,6 +11,7 @@ import {
   updateCoreValues,
   updateStoryMilestones,
   updateOffices,
+  deleteOffice,
   getFaqs,
   updateFaqs,
   updateProcessSteps,
@@ -35,6 +36,7 @@ router.put('/company/leadership', protect, authorize('admin', 'developer'), upda
 router.put('/company/values', protect, authorize('admin', 'developer'), updateCoreValues);
 router.put('/company/milestones', protect, authorize('admin', 'developer'), updateStoryMilestones);
 router.put('/company/offices', protect, authorize('admin', 'developer'), updateOffices);
+router.delete('/company/offices/:id', protect, authorize('admin', 'developer'), deleteOffice);
 router.put('/company/faqs', protect, authorize('admin', 'developer'), updateFaqs);
 router.put('/company/process', protect, authorize('admin', 'developer'), updateProcessSteps);
 
