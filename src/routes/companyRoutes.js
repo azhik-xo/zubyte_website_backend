@@ -13,6 +13,7 @@ import {
   updateOffices,
   getFaqs,
   updateFaqs,
+  updateProcessSteps,
 } from '../controllers/companyController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 
@@ -35,5 +36,6 @@ router.put('/company/values', protect, authorize('admin', 'developer'), updateCo
 router.put('/company/milestones', protect, authorize('admin', 'developer'), updateStoryMilestones);
 router.put('/company/offices', protect, authorize('admin', 'developer'), updateOffices);
 router.put('/company/faqs', protect, authorize('admin', 'developer'), updateFaqs);
+router.put('/company/process', protect, authorize('admin', 'developer'), updateProcessSteps);
 
 export default router;

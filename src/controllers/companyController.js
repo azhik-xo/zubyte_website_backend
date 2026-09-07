@@ -42,6 +42,12 @@ const getOrCreateCompany = async () => {
     modified = true;
   }
 
+  // Ensure processSteps exists
+  if (!company.processSteps || company.processSteps.length === 0) {
+    company.processSteps = COMPANY_SEED.processSteps || [];
+    modified = true;
+  }
+
   // Ensure leadership exists
   if (!company.leadership || !company.leadership.name) {
     company.leadership = COMPANY_SEED.leadership;
@@ -145,6 +151,10 @@ export const updateCompanyInfo = async (req, res, next) => {
 
       if (Array.isArray(updateData.clientLogos)) {
         company.clientLogos = updateData.clientLogos;
+      }
+
+      if (Array.isArray(updateData.processSteps)) {
+        company.processSteps = updateData.processSteps;
       }
 
       await company.save();
@@ -446,3 +456,31 @@ export const updateFaqs = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Update Delivery Process Steps
+ * @route   PUT /api/company/process
+ * @access  Private (Admin, Developer)
+ */
+export const updateProcessSteps = async (req, res, next) => {
+  try {
+    const { processSteps } = req.body;
+
+    if (!Array.isArray(processSteps)) {
+      return ApiResponse.badRequest(res, 'processSteps must be an array');
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const company = await getOrCreateCompany();
+      company.processSteps = processSteps;
+      await company.save();
+      return ApiResponse.success(res, company.processSteps, 'Process steps updated successfully');
+    }
+
+    inMemoryCompany.processSteps = processSteps;
+    return ApiResponse.success(res, inMemoryCompany.processSteps, 'Process steps updated (offline mode)');
+  } catch (error) {
+    next(error);
+  }
+};
+

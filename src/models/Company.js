@@ -67,6 +67,20 @@ const companySchema = new mongoose.Schema(
         a: String,
       },
     ],
+    processSteps: [
+      {
+        step: String,
+        name: String,
+        desc: String,
+        detail: String,
+        extras: [
+          {
+            label: String,
+            desc: String,
+          },
+        ],
+      },
+    ],
   },
   {
     timestamps: true,
