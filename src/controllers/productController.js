@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { Product } from '../models/Product.js';
 import { PRODUCTS_SEED } from '../seeds/seedData.js';
 import { ApiResponse } from '../utils/apiResponse.js';
-import { deleteFromCloudinary } from '../config/cloudinary.js';
+import { cleanupImageIfUnused } from '../utils/imageCleanupHelper.js';
 
 let inMemoryProducts = JSON.parse(JSON.stringify(PRODUCTS_SEED));
 
@@ -93,11 +93,19 @@ export const createProduct = async (req, res, next) => {
 export const updateProduct = async (req, res, next) => {
   try {
     if (mongoose.connection.readyState === 1) {
+      const existing = await Product.findById(req.params.id);
+      if (!existing) return ApiResponse.notFound(res, 'Product suite not found');
+
+      // If suite image changed, clean up previous image if unreferenced
+      if (req.body.img && existing.img && req.body.img !== existing.img) {
+        await cleanupImageIfUnused(existing.img);
+      }
+
       const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true,
       });
-      if (!product) return ApiResponse.notFound(res, 'Product suite not found');
+
       return ApiResponse.success(res, product, 'Product suite updated successfully');
     }
 
@@ -122,17 +130,17 @@ export const deleteProduct = async (req, res, next) => {
       const product = await Product.findById(req.params.id);
       if (!product) return ApiResponse.notFound(res, 'Product suite not found');
 
-      if (product.img && product.img.includes('res.cloudinary.com')) {
-        await deleteFromCloudinary(product.img, 'image');
+      if (product.img) {
+        await cleanupImageIfUnused(product.img);
       }
 
       await Product.findByIdAndDelete(req.params.id);
-      return ApiResponse.success(res, null, 'Product suite and Cloudinary asset deleted successfully');
+      return ApiResponse.success(res, null, 'Product suite deleted successfully');
     }
 
     const prd = inMemoryProducts.find((p) => p._id === req.params.id || p.id === req.params.id);
-    if (prd?.img && prd.img.includes('res.cloudinary.com')) {
-      await deleteFromCloudinary(prd.img, 'image');
+    if (prd?.img) {
+      await cleanupImageIfUnused(prd.img);
     }
 
     inMemoryProducts = inMemoryProducts.filter((p) => p._id !== req.params.id && p.id !== req.params.id);
@@ -142,9 +150,6 @@ export const deleteProduct = async (req, res, next) => {
   }
 };
 
-
 export const createProductSuite = createProduct;
 export const updateProductSuite = updateProduct;
 export const deleteProductSuite = deleteProduct;
-
-

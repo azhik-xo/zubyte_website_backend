@@ -1,0 +1,102 @@
+{
+  "timestamp": "2026-09-23T04:46:23.728Z",
+  "database": "test",
+  "records": [
+    {
+      "collection": "CaseStudy",
+      "id": "6a94965490211b914f49a3d6",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788937256/zubyte_asset/file_izzprg.png"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6a9efa1661ec0d35c86e8085",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788923410/zubyte_asset/file_oaqabv.jpg"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6aa0cce2b150a2201311bcce",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788923094/zubyte_asset/file_vksyir.webp"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6aa0cf03b150a2201311bd41",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788923597/zubyte_asset/file_ctfmj2.jpg"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6aa0d05cb150a2201311bdbd",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788924008/zubyte_asset/file_hs2l6w.png"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6aa0d166b150a2201311bdc6",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788924602/zubyte_asset/file_lm5hto.png"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6aa0d25ab150a2201311bdcb",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788924551/zubyte_asset/file_evqun1.png"
+    },
+    {
+      "collection": "CaseStudy",
+      "id": "6aa0d396b150a2201311bdd5",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788924772/zubyte_asset/file_ya0ayg.jpg"
+    },
+    {
+      "collection": "Product",
+      "id": "6a94965490211b914f49a3ce",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122686/zubyte_asset/ntmjbcrxeibvdisyt7r3.jpg"
+    },
+    {
+      "collection": "Product",
+      "id": "6a94965490211b914f49a3d0",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122687/zubyte_asset/id3rowi94otyqcvcdut6.jpg"
+    },
+    {
+      "collection": "Service",
+      "id": "6a94965490211b914f49a3ad",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122678/zubyte_asset/giaqv7qbrmwaahi84v6i.jpg"
+    },
+    {
+      "collection": "Service",
+      "id": "6a94965490211b914f49a3b7",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122681/zubyte_asset/fcvkdpnj6ldl3kfbgz6n.jpg"
+    },
+    {
+      "collection": "Service",
+      "id": "6a94965490211b914f49a3b2",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122679/zubyte_asset/vcv3tnfqhzg1xhpi67jx.jpg"
+    },
+    {
+      "collection": "Service",
+      "id": "6a94965490211b914f49a3bc",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122682/zubyte_asset/qcd4yj1p1e0fch7ykfvz.jpg"
+    },
+    {
+      "collection": "Service",
+      "id": "6a94965490211b914f49a3c1",
+      "field": "img",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788122683/zubyte_asset/e53xwq1zqcezjji9zamg.jpg"
+    },
+    {
+      "collection": "Inquiry",
+      "id": "6a9eff5761ec0d35c86e891d",
+      "field": "attachment.path",
+      "originalValue": "https://res.cloudinary.com/h8vtnbby/image/upload/v1788804950/zubyte_asset/file_gwqgzt.pdf"
+    }
+  ]
+}

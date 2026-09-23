@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { CaseStudy } from '../models/CaseStudy.js';
 import { CASE_STUDIES_SEED } from '../seeds/seedData.js';
 import { ApiResponse } from '../utils/apiResponse.js';
-import { deleteFromCloudinary } from '../config/cloudinary.js';
+import { cleanupImageIfUnused } from '../utils/imageCleanupHelper.js';
 
 let inMemoryPortfolio = JSON.parse(JSON.stringify(CASE_STUDIES_SEED));
 
@@ -118,11 +118,19 @@ export const createCaseStudy = async (req, res, next) => {
 export const updateCaseStudy = async (req, res, next) => {
   try {
     if (mongoose.connection.readyState === 1) {
+      const existing = await CaseStudy.findById(req.params.id);
+      if (!existing) return ApiResponse.notFound(res, 'Case study not found');
+
+      // If image is being replaced, clean up old image if unreferenced
+      if (req.body.img && existing.img && req.body.img !== existing.img) {
+        await cleanupImageIfUnused(existing.img);
+      }
+
       const caseStudy = await CaseStudy.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true,
       });
-      if (!caseStudy) return ApiResponse.notFound(res, 'Case study not found');
+
       return ApiResponse.success(res, caseStudy, 'Case study updated successfully');
     }
 
@@ -149,20 +157,20 @@ export const deleteCaseStudy = async (req, res, next) => {
       const caseStudy = await CaseStudy.findById(req.params.id);
       if (!caseStudy) return ApiResponse.notFound(res, 'Case study not found');
 
-      // Delete image from Cloudinary if hosted there
-      if (caseStudy.img && caseStudy.img.includes('res.cloudinary.com')) {
-        await deleteFromCloudinary(caseStudy.img, 'image');
+      // Safely cleanup image if not used by any other document
+      if (caseStudy.img) {
+        await cleanupImageIfUnused(caseStudy.img);
       }
 
       await CaseStudy.findByIdAndDelete(req.params.id);
-      return ApiResponse.success(res, null, 'Case study and Cloudinary asset deleted successfully');
+      return ApiResponse.success(res, null, 'Case study deleted successfully');
     }
 
     const proj = inMemoryPortfolio.find(
       (p) => p._id === req.params.id || p.title === req.params.id
     );
-    if (proj?.img && proj.img.includes('res.cloudinary.com')) {
-      await deleteFromCloudinary(proj.img, 'image');
+    if (proj?.img) {
+      await cleanupImageIfUnused(proj.img);
     }
 
     inMemoryPortfolio = inMemoryPortfolio.filter((p) => p._id !== req.params.id && p.title !== req.params.id);
@@ -172,7 +180,4 @@ export const deleteCaseStudy = async (req, res, next) => {
   }
 };
 
-
 export const getCaseStudies = getAllCaseStudies;
-
-

@@ -31,7 +31,7 @@ const fileFilter = (req, file, cb) => {
 
 const maxFileSizeMB = parseInt(process.env.MAX_FILE_SIZE_MB || '15', 10);
 
-// Use memoryStorage so uploaded files are streamed straight to Cloudinary without local disk storage
+// Use memoryStorage so uploaded files are streamed straight to GridFS without local disk storage
 export const uploadAttachment = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: maxFileSizeMB * 1024 * 1024 },

@@ -1,98 +1,117 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { uploadToCloudinary, deleteFromCloudinary, isCloudinaryConfigured } from '../config/cloudinary.js';
+import mongoose from 'mongoose';
+import { getImageBucket, uploadBufferToGridFS, deleteFileFromGridFS } from '../config/gridfs.js';
+import { Image } from '../models/Image.js';
+import { validateImageFile, sanitizeFilename } from '../utils/fileValidation.js';
+import { isImageReferenced } from '../utils/referenceChecker.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 /**
- * @desc    Upload an image to Cloudinary (with fallback to local storage)
+ * @desc    Upload an image directly to MongoDB GridFS with validation
  * @route   POST /api/upload/image
  * @access  Private (Admin & Developer)
  */
 export const uploadImage = async (req, res, next) => {
   try {
-    if (!req.file) {
+    if (!req.file || !req.file.buffer) {
       return ApiResponse.badRequest(res, 'Please provide an image file to upload');
     }
 
-    const folder = req.body.folder || 'zubyte_asset';
+    const maxBytes = parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10) * 1024 * 1024;
+    const validation = validateImageFile(req.file.buffer, req.file.originalname, maxBytes);
 
-    if (isCloudinaryConfigured) {
-      // Upload memory buffer directly to Cloudinary
-      const result = await uploadToCloudinary(req.file.buffer, folder);
-
-      return ApiResponse.created(
-        res,
-        {
-          url: result.secure_url,
-          publicId: result.public_id,
-          width: result.width,
-          height: result.height,
-          format: result.format,
-          bytes: result.bytes,
-          storage: 'cloudinary',
-        },
-        'Image uploaded successfully to Cloudinary'
-      );
-    } else {
-      // Local disk fallback
-      const uploadDir = path.join(__dirname, '../../uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      const sanitizedBase = path
-        .basename(req.file.originalname, ext)
-        .replace(/[^a-zA-Z0-9_-]/g, '_');
-      const filename = `${sanitizedBase}-${Date.now()}${ext}`;
-      const filePath = path.join(uploadDir, filename);
-
-      fs.writeFileSync(filePath, req.file.buffer);
-
-      const localUrl = `/uploads/${filename}`;
-
-      return ApiResponse.created(
-        res,
-        {
-          url: localUrl,
-          publicId: filename,
-          format: ext.replace('.', ''),
-          bytes: req.file.size,
-          storage: 'local',
-        },
-        'Image uploaded successfully (local storage)'
-      );
+    if (!validation.valid) {
+      return ApiResponse.badRequest(res, validation.error);
     }
+
+    const safeFilename = sanitizeFilename(req.file.originalname);
+    const bucket = getImageBucket();
+
+    // 1. Upload binary stream to MongoDB GridFS 'image_files'
+    const fileId = await uploadBufferToGridFS(bucket, req.file.buffer, safeFilename, {
+      contentType: validation.contentType,
+      metadata: {
+        originalName: req.file.originalname,
+        uploadedBy: req.user ? req.user._id : null,
+      },
+    });
+
+    // 2. Create rich Image metadata record in MongoDB
+    const imageDoc = await Image.create({
+      filename: safeFilename,
+      originalName: req.file.originalname,
+      contentType: validation.contentType,
+      size: req.file.size || req.file.buffer.length,
+      fileId,
+      alt: req.body.alt || '',
+    });
+
+    const imageUrl = `/api/images/${imageDoc._id}`;
+
+    return ApiResponse.created(
+      res,
+      {
+        id: imageDoc._id,
+        imageId: imageDoc._id,
+        url: imageUrl,
+        fileId: imageDoc.fileId,
+        filename: imageDoc.filename,
+        originalName: imageDoc.originalName,
+        contentType: imageDoc.contentType,
+        size: imageDoc.size,
+        storage: 'gridfs',
+      },
+      'Image uploaded successfully to MongoDB GridFS'
+    );
   } catch (error) {
+    console.error('[Upload Image Error]', error.message);
     next(error);
   }
 };
 
 /**
- * @desc    Delete an image from Cloudinary
+ * @desc    Delete an image from MongoDB GridFS
  * @route   DELETE /api/upload/image/:publicId
  * @access  Private (Admin & Developer)
  */
 export const deleteImage = async (req, res, next) => {
   try {
-    const publicId = decodeURIComponent(req.params.publicId);
-
-    if (isCloudinaryConfigured) {
-      await deleteFromCloudinary(publicId);
-    } else {
-      const filePath = path.join(__dirname, '../../uploads', publicId);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+    const rawParam = decodeURIComponent(req.params.publicId || '');
+    if (!rawParam) {
+      return ApiResponse.badRequest(res, 'Image identifier is required');
     }
 
-    return ApiResponse.success(res, { publicId }, 'Image deleted successfully');
+    // Check if parameter is or contains a 24-character hexadecimal ObjectId
+    const cleanId = rawParam.split('.')[0].replace(/^\/api\/images\//, '').trim();
+
+    if (mongoose.Types.ObjectId.isValid(cleanId)) {
+      const objectId = new mongoose.Types.ObjectId(cleanId);
+      const imageDoc =
+        (await Image.findById(objectId)) || (await Image.findOne({ fileId: objectId }));
+
+      const force = req.query.force === 'true';
+      if (imageDoc && !force) {
+        const referenced = await isImageReferenced(imageDoc._id);
+        if (referenced) {
+          return ApiResponse.badRequest(
+            res,
+            'Cannot delete image: it is currently referenced by active website content'
+          );
+        }
+      }
+
+      const bucket = getImageBucket();
+      const fileId = imageDoc ? imageDoc.fileId : objectId;
+      await deleteFileFromGridFS(bucket, fileId);
+
+      if (imageDoc) {
+        await Image.findByIdAndDelete(imageDoc._id);
+      }
+
+      return ApiResponse.success(res, { id: cleanId }, 'Image deleted successfully from MongoDB GridFS');
+    }
+
+    return ApiResponse.badRequest(res, 'Invalid image identifier');
   } catch (error) {
     next(error);
   }
 };
-

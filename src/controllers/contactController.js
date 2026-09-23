@@ -2,16 +2,18 @@ import mongoose from 'mongoose';
 import { Inquiry } from '../models/Inquiry.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import {
-  uploadToCloudinary,
-  deleteFromCloudinary,
-  isCloudinaryConfigured,
-} from '../config/cloudinary.js';
+  getAttachmentBucket,
+  uploadBufferToGridFS,
+  findGridFSFile,
+  deleteFileFromGridFS,
+} from '../config/gridfs.js';
+import { sanitizeFilename } from '../utils/fileValidation.js';
 
 // In-memory store fallback when DB is disconnected
 let inMemoryInquiries = [];
 
 /**
- * @desc    Submit a new contact inquiry (with optional file attachment)
+ * @desc    Submit a new contact inquiry (with optional file attachment stored in GridFS)
  * @route   POST /api/contact
  * @access  Public
  */
@@ -20,32 +22,49 @@ export const submitInquiry = async (req, res, next) => {
     const { firstName, lastName, email, company, message, serviceInterest } = req.body;
 
     let attachmentData = null;
-    if (req.file) {
-      let fileUrl = `/uploads/${req.file.filename}`;
-      let publicId = req.file.filename;
-
-      if (isCloudinaryConfigured) {
+    if (req.file && req.file.buffer) {
+      if (mongoose.connection.readyState === 1) {
         try {
-          const fileData = req.file.buffer || req.file.path;
-          const cloudResult = await uploadToCloudinary(fileData, 'zubyte_asset', 'auto');
-          if (cloudResult && cloudResult.secure_url) {
-            fileUrl = cloudResult.secure_url;
-            publicId = cloudResult.public_id;
-          }
+          const attachmentBucket = getAttachmentBucket();
+          const safeFilename = sanitizeFilename(req.file.originalname);
+
+          const fileId = await uploadBufferToGridFS(
+            attachmentBucket,
+            req.file.buffer,
+            safeFilename,
+            {
+              contentType: req.file.mimetype,
+              metadata: {
+                originalName: req.file.originalname,
+                sizeBytes: req.file.size,
+                uploadedAt: new Date(),
+              },
+            }
+          );
+
+          attachmentData = {
+            originalName: req.file.originalname,
+            filename: safeFilename,
+            mimeType: req.file.mimetype,
+            sizeBytes: req.file.size,
+            path: `/api/contact/attachment/${fileId}`,
+          };
         } catch (uploadErr) {
-          console.warn('[Cloudinary Notice] Attachment upload fallback to local storage:', uploadErr.message);
+          console.warn('[Attachment Upload Error]', uploadErr.message);
         }
       }
 
-      attachmentData = {
-        originalName: req.file.originalname,
-        filename: publicId || req.file.filename,
-        mimeType: req.file.mimetype,
-        sizeBytes: req.file.size,
-        path: fileUrl,
-      };
+      // Memory fallback if DB offline
+      if (!attachmentData) {
+        attachmentData = {
+          originalName: req.file.originalname,
+          filename: req.file.originalname,
+          mimeType: req.file.mimetype,
+          sizeBytes: req.file.size,
+          path: `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`,
+        };
+      }
     }
-
 
     if (mongoose.connection.readyState === 1) {
       const inquiry = await Inquiry.create({
@@ -100,6 +119,64 @@ export const submitInquiry = async (req, res, next) => {
     );
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * @desc    Stream contact inquiry attachment from GridFS 'attachment_files' bucket
+ * @route   GET /api/contact/attachment/:id
+ * @access  Public
+ */
+export const getInquiryAttachment = async (req, res, next) => {
+  try {
+    const rawId = req.params.id;
+    const cleanId = rawId.split('.')[0].trim();
+
+    if (!mongoose.Types.ObjectId.isValid(cleanId)) {
+      return ApiResponse.notFound(res, 'Attachment not found (invalid identifier)');
+    }
+
+    const objectId = new mongoose.Types.ObjectId(cleanId);
+    const bucket = getAttachmentBucket();
+    const file = await findGridFSFile(bucket, objectId);
+
+    if (!file) {
+      return ApiResponse.notFound(res, 'Attachment not found in storage');
+    }
+
+    const contentType = file.contentType || file.metadata?.contentType || 'application/octet-stream';
+    const originalName = file.metadata?.originalName || file.filename || 'attachment';
+
+    res.setHeader('Content-Type', contentType);
+    if (file.length) {
+      res.setHeader('Content-Length', file.length);
+    }
+
+    // PDFs and images display inline; other formats prompt download
+    const isInline = contentType.includes('pdf') || contentType.startsWith('image/');
+    res.setHeader(
+      'Content-Disposition',
+      `${isInline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(originalName)}"`
+    );
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+
+    const downloadStream = bucket.openDownloadStream(file._id);
+
+    downloadStream.on('error', (err) => {
+      console.warn(`[GridFS Attachment Stream Error] ${file._id}:`, err.message);
+      if (!res.headersSent) {
+        return ApiResponse.error(res, 'Error streaming attachment', 500);
+      }
+      res.end();
+    });
+
+    downloadStream.pipe(res);
+  } catch (error) {
+    console.error('[Get Attachment Error]', error.message);
+    if (!res.headersSent) {
+      return ApiResponse.notFound(res, 'Attachment not found');
+    }
+    res.end();
   }
 };
 
@@ -249,14 +326,13 @@ export const updateInquiryStatus = async (req, res, next) => {
         ? 'Inquiry marked as contacted. It will automatically be deleted in 24 hours.'
         : 'Inquiry updated'
     );
-
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * @desc    Delete inquiry
+ * @desc    Delete inquiry and purge its attachment from GridFS
  * @route   DELETE /api/contact/:id
  * @access  Private / Admin
  */
@@ -266,18 +342,19 @@ export const deleteInquiry = async (req, res, next) => {
       const inquiry = await Inquiry.findById(req.params.id);
       if (!inquiry) return ApiResponse.notFound(res, 'Inquiry not found');
 
-      // Delete attached file from Cloudinary if present
-      if (inquiry.attachment?.path && inquiry.attachment.path.includes('res.cloudinary.com')) {
-        await deleteFromCloudinary(inquiry.attachment.path, 'auto');
+      const attachmentPath = inquiry.attachment?.path || '';
+
+      // Purge from GridFS attachment_files bucket
+      if (attachmentPath.includes('/api/contact/attachment/')) {
+        const fileId = attachmentPath.split('/api/contact/attachment/')[1]?.split('?')[0];
+        if (fileId && mongoose.Types.ObjectId.isValid(fileId)) {
+          const bucket = getAttachmentBucket();
+          await deleteFileFromGridFS(bucket, fileId);
+        }
       }
 
       await Inquiry.findByIdAndDelete(req.params.id);
       return ApiResponse.success(res, null, 'Inquiry and attached assets deleted successfully');
-    }
-
-    const inq = inMemoryInquiries.find((i) => i._id === req.params.id);
-    if (inq?.attachment?.path && inq.attachment.path.includes('res.cloudinary.com')) {
-      await deleteFromCloudinary(inq.attachment.path, 'auto');
     }
 
     inMemoryInquiries = inMemoryInquiries.filter((i) => i._id !== req.params.id);
@@ -286,4 +363,3 @@ export const deleteInquiry = async (req, res, next) => {
     next(error);
   }
 };
-

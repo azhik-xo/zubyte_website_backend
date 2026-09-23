@@ -8,7 +8,7 @@ This guide outlines the step-by-step process to deploy the **Express.js & MongoD
 1. A [GitHub](https://github.com) account with your Zubyte project repository pushed.
 2. A free [Render.com](https://render.com) account.
 3. Your **MongoDB Atlas Connection URI**.
-4. Your **Cloudinary Credentials** (`h8vtnbby`).
+4. (Optional) Maximum file upload size configuration (`MAX_FILE_SIZE_MB=10`).
 
 ---
 
@@ -20,7 +20,7 @@ Render will automatically detect [`render.yaml`](./render.yaml) in your reposito
 2. Click **New +** → **Blueprint**.
 3. Select your **Zubyte repository**.
 4. Render will read `render.yaml` and configure the web service automatically.
-5. Fill in the required secret environment variables (MongoDB URI, Cloudinary API Key, etc.) when prompted.
+5. Fill in the required secret environment variables (MongoDB URI, etc.) when prompted.
 6. Click **Apply**.
 
 ---
@@ -59,10 +59,8 @@ Under the **Environment Variables** section in Render, add the following key-val
 | `MONGODB_URI` | `mongodb+srv://<user>:<password>@cluster0.mongodb.net/zubyte_db?retryWrites=true&w=majority` | Your MongoDB Atlas connection URI |
 | `JWT_SECRET` | *(Random 32+ character string)* | Secret for signing JWT authentication tokens |
 | `JWT_EXPIRE` | `7d` | Token validity duration |
-| `CLOUDINARY_CLOUD_NAME` | `h8vtnbby` | Cloudinary Cloud Name |
-| `CLOUDINARY_API_KEY` | *(Your Cloudinary API Key)* | Cloudinary API Key from console |
-| `CLOUDINARY_API_SECRET` | *(Your Cloudinary API Secret)* | Cloudinary API Secret from console |
 | `CLIENT_URL` | `https://your-frontend.vercel.app,http://localhost:3000` | Allowed frontend URLs for CORS (or `*`) |
+| `MAX_FILE_SIZE_MB` | `10` | Maximum upload size in MB (defaults to 10MB) |
 
 ---
 

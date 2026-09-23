@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   submitInquiry,
+  getInquiryAttachment,
   getInquiries,
   getInquiryById,
   updateInquiryStatus,
@@ -22,6 +23,9 @@ router.post(
   validateEmail,
   submitInquiry
 );
+
+// Public attachment streaming endpoint
+router.get('/attachment/:id', getInquiryAttachment);
 
 // Protected Admin & Developer inquiry management
 router.get('/', protect, getInquiries);

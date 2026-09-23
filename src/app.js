@@ -14,6 +14,7 @@ import productRoutes from './routes/productRoutes.js';
 import portfolioRoutes from './routes/portfolioRoutes.js';
 import demoRoutes from './routes/demoRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
+import imageRoutes from './routes/imageRoutes.js';
 
 import { errorHandler } from './middlewares/errorHandler.js';
 import { generalApiLimiter } from './middlewares/rateLimiter.js';
@@ -112,6 +113,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/images', imageRoutes);
 app.use('/api', demoRoutes);
 app.use('/api', companyRoutes);
 
@@ -121,6 +123,7 @@ app.use('/contact', contactRoutes);
 app.use('/services', serviceRoutes);
 app.use('/products', productRoutes);
 app.use('/portfolio', portfolioRoutes);
+app.use('/images', imageRoutes);
 app.use('/', demoRoutes);
 app.use('/', companyRoutes);
 

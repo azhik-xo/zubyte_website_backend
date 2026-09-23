@@ -19,12 +19,6 @@ services:
         generateValue: true
       - key: JWT_EXPIRE
         value: 7d
-      - key: CLOUDINARY_CLOUD_NAME
-        value: h8vtnbby
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
       - key: CLIENT_URL
         value: "*"
 

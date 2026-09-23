@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { Service } from '../models/Service.js';
 import { SERVICES_SEED } from '../seeds/seedData.js';
 import { ApiResponse } from '../utils/apiResponse.js';
-import { deleteFromCloudinary } from '../config/cloudinary.js';
+import { cleanupImageIfUnused } from '../utils/imageCleanupHelper.js';
 
 let inMemoryServices = JSON.parse(JSON.stringify(SERVICES_SEED));
 
@@ -96,17 +96,23 @@ export const createServiceGroup = async (req, res, next) => {
 export const updateServiceGroup = async (req, res, next) => {
   try {
     if (mongoose.connection.readyState === 1) {
+      const existing = await Service.findById(req.params.id);
+      if (!existing) return ApiResponse.notFound(res, 'Service group not found');
+
+      if (req.body.img && existing.img && req.body.img !== existing.img) {
+        await cleanupImageIfUnused(existing.img);
+      }
+
       const serviceGroup = await Service.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true,
       });
-      if (!serviceGroup) return ApiResponse.notFound(res, 'Service group not found');
+
       return ApiResponse.success(res, serviceGroup, 'Service group updated successfully');
     }
 
     const index = inMemoryServices.findIndex((s) => s._id === req.params.id || s.slug === req.params.id);
     if (index === -1) {
-      // If updating existing by matching group name
       const fallbackIdx = inMemoryServices.findIndex((s) => s.group === req.body.group);
       if (fallbackIdx !== -1) {
         inMemoryServices[fallbackIdx] = { ...inMemoryServices[fallbackIdx], ...req.body };
@@ -133,17 +139,17 @@ export const deleteServiceGroup = async (req, res, next) => {
       const serviceGroup = await Service.findById(req.params.id);
       if (!serviceGroup) return ApiResponse.notFound(res, 'Service group not found');
 
-      if (serviceGroup.img && serviceGroup.img.includes('res.cloudinary.com')) {
-        await deleteFromCloudinary(serviceGroup.img, 'image');
+      if (serviceGroup.img) {
+        await cleanupImageIfUnused(serviceGroup.img);
       }
 
       await Service.findByIdAndDelete(req.params.id);
-      return ApiResponse.success(res, null, 'Service group and Cloudinary asset deleted successfully');
+      return ApiResponse.success(res, null, 'Service group deleted successfully');
     }
 
     const grp = inMemoryServices.find((s) => s._id === req.params.id || s.slug === req.params.id);
-    if (grp?.img && grp.img.includes('res.cloudinary.com')) {
-      await deleteFromCloudinary(grp.img, 'image');
+    if (grp?.img) {
+      await cleanupImageIfUnused(grp.img);
     }
 
     inMemoryServices = inMemoryServices.filter((s) => s._id !== req.params.id && s.slug !== req.params.id);
@@ -152,4 +158,3 @@ export const deleteServiceGroup = async (req, res, next) => {
     next(error);
   }
 };
-

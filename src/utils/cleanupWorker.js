@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
 import { Inquiry } from '../models/Inquiry.js';
-import { deleteFromCloudinary } from '../config/cloudinary.js';
+import { getAttachmentBucket, deleteFileFromGridFS } from '../config/gridfs.js';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Sweeps and deletes contacted inquiries and their Cloudinary attachments older than 24 hours
+ * Sweeps and deletes contacted inquiries and their attachments older than 24 hours
  */
 export const runContactedInquiriesCleanup = async () => {
   try {
@@ -23,13 +23,19 @@ export const runContactedInquiriesCleanup = async () => {
       console.log(`[Auto-Cleanup] Found ${expiredInquiries.length} contacted inquiries older than 24 hours to purge...`);
 
       for (const inq of expiredInquiries) {
-        // Purge Cloudinary attachment if present
-        if (inq.attachment?.path && inq.attachment.path.includes('res.cloudinary.com')) {
+        const attachmentPath = inq.attachment?.path || '';
+
+        // 1. Purge GridFS attachment if stored in MongoDB
+        if (attachmentPath.includes('/api/contact/attachment/')) {
           try {
-            await deleteFromCloudinary(inq.attachment.path, 'auto');
-            console.log(`  ✓ Cloudinary asset purged for inquiry ${inq._id}`);
-          } catch (cloudErr) {
-            console.warn(`  ✕ Could not purge Cloudinary asset for ${inq._id}:`, cloudErr.message);
+            const fileId = attachmentPath.split('/api/contact/attachment/')[1]?.split('?')[0];
+            if (fileId && mongoose.Types.ObjectId.isValid(fileId)) {
+              const bucket = getAttachmentBucket();
+              await deleteFileFromGridFS(bucket, fileId);
+              console.log(`  ✓ GridFS attachment purged for inquiry ${inq._id}`);
+            }
+          } catch (gridErr) {
+            console.warn(`  ✕ Could not purge GridFS attachment for ${inq._id}:`, gridErr.message);
           }
         }
 
@@ -60,4 +66,3 @@ export const startCleanupWorker = (intervalMs = 30 * 60 * 1000) => {
 
   return timer;
 };
-
